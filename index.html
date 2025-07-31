@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple NWS Weather App</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { text-align: center; }
+    input, button { padding: 0.5rem; font-size: 1rem; }
+    button { margin-left: 0.5rem; }
+    #results { margin-top: 1.5rem; }
+    .forecast-day { margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Weather Lookup</h1>
+  <div>
+    <input id="locationInput" type="text" placeholder="Enter city, ZIP, or address">
+    <button id="lookupBtn">Get Forecast</button>
+  </div>
+  <div id="results"></div>
+
+  <script>
+    async function getJSON(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    document.getElementById('lookupBtn').addEventListener('click', async () => {
+      const loc = document.getElementById('locationInput').value.trim();
+      if (!loc) return alert('Please enter a location');
+      try {
+        // 1. Geocode via Nominatim
+        const geo = await getJSON(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(loc)}`
+        );
+        if (!geo.length) throw new Error('Location not found');
+        const { lat, lon } = geo[0];
+
+        // 2. Get forecast URL from NWS
+        const point = await getJSON(`https://api.weather.gov/points/${lat},${lon}`);
+        const forecastUrl = point.properties.forecast;
+
+        // 3. Fetch forecast data
+        const forecast = await getJSON(forecastUrl);
+        const periods = forecast.properties.periods;
+
+        // 4. Render results
+        const container = document.getElementById('results');
+        container.innerHTML = `<h2>Forecast for ${point.properties.relativeLocation.properties.city}, ${point.properties.relativeLocation.properties.state}</h2>`;
+        periods.forEach(day => {
+          const div = document.createElement('div');
+          div.className = 'forecast-day';
+          div.innerHTML = `
+            <strong>${day.name}</strong>: ${day.temperature}°${day.temperatureUnit} – ${day.shortForecast}
+          `;
+          container.appendChild(div);
+        });
+      } catch (e) {
+        document.getElementById('results').textContent = 'Error: ' + e.message;
+      }
+    });
+  </script>
+</body>
+</html>
