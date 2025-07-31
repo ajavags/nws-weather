@@ -47,17 +47,53 @@
         const forecast = await getJSON(forecastUrl);
         const periods = forecast.properties.periods;
 
-        // 4. Render results
+        // 4. Group and render detailed for today, summary for tomorrow
         const container = document.getElementById('results');
-        container.innerHTML = `<h2>Forecast for ${point.properties.relativeLocation.properties.city}, ${point.properties.relativeLocation.properties.state}</h2>`;
-        periods.forEach(day => {
-          const div = document.createElement('div');
-          div.className = 'forecast-day';
-          div.innerHTML = `
-            <strong>${day.name}</strong>: ${day.temperature}°${day.temperatureUnit} – ${day.shortForecast}
+        container.innerHTML = `<h2>Weather for ${point.properties.relativeLocation.properties.city}, ${point.properties.relativeLocation.properties.state}</h2>`;
+
+        // Group periods by date
+        const periodsByDate = periods.reduce((acc, p) => {
+          const date = p.startTime.split('T')[0];
+          acc[date] = acc[date] || [];
+          acc[date].push(p);
+          return acc;
+        }, {});
+
+        // Compute today and tomorrow dates (YYYY-MM-DD)
+        const today = new Date().toISOString().split('T')[0];
+        const tomorrowDate = new Date();
+        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        const tomorrow = tomorrowDate.toISOString().split('T')[0];
+
+        // Detailed forecast for today
+        container.innerHTML += `<h3>Detailed Forecast for Today (${today})</h3>`;
+        if (periodsByDate[today]) {
+          periodsByDate[today].forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'forecast-period';
+            div.innerHTML = `
+              <strong>${p.name}</strong>: ${p.detailedForecast}
+            `;
+            container.appendChild(div);
+          });
+        } else {
+          container.innerHTML += `<p>No detailed data available for today.</p>`;
+        }
+
+        // Summary for tomorrow
+        container.innerHTML += `<h3>Summary for Tomorrow (${tomorrow})</h3>`;
+        if (periodsByDate[tomorrow]) {
+          // pick the daytime period if available
+          const next = periodsByDate[tomorrow].find(x => x.isDaytime) || periodsByDate[tomorrow][0];
+          const div2 = document.createElement('div');
+          div2.className = 'forecast-summary';
+          div2.innerHTML = `
+            <strong>${next.name}</strong>: ${next.temperature}°${next.temperatureUnit} – ${next.shortForecast}
           `;
-          container.appendChild(div);
-        });
+          container.appendChild(div2);
+        } else {
+          container.innerHTML += `<p>No summary data available for tomorrow.</p>`;
+        }
       } catch (e) {
         document.getElementById('results').textContent = 'Error: ' + e.message;
       }
